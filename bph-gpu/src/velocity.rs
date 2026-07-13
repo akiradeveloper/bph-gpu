@@ -31,7 +31,7 @@ pub fn sub_average_velocity<R: Runtime>(
 
     // Compute average velocity.
     let Zip(Zip(cell_ave_u, cell_ave_v), cell_ave_w) = exec.alloc::<f32_3>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             zip3(
@@ -51,8 +51,7 @@ pub fn sub_average_velocity<R: Runtime>(
     .unwrap();
 
     // Subtract average velocity.
-    let Zip(Zip(ave_u, ave_v), ave_w) = exec.alloc::<f32_3>(idx.len());
-    massively::gather(
+    let Zip(Zip(ave_u, ave_v), ave_w) = massively::vector::gather(
         exec,
         zip3(
             cell_ave_u.slice(..),
@@ -60,15 +59,10 @@ pub fn sub_average_velocity<R: Runtime>(
             cell_ave_w.slice(..),
         ),
         idx.slice(..),
-        zip3(
-            ave_u.slice_mut(..),
-            ave_v.slice_mut(..),
-            ave_w.slice_mut(..),
-        ),
     )
     .unwrap();
 
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             zip3(u.slice(..), v.slice(..), w.slice(..)),
@@ -102,7 +96,7 @@ pub fn add_average_velocity<R: Runtime>(
     ave_v: DeviceSlice<f32>,
     ave_w: DeviceSlice<f32>,
 ) {
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             zip3(u.slice(..), v.slice(..), w.slice(..)),

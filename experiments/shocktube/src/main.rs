@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         2,
     );
 
-    massively::transform(
+    bph_gpu::algorithm::transform_into(
         &exec,
         zip4(
             u.slice(0..sep),
@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             w.slice_mut(0..sep),
         ),
     )?;
-    massively::transform(
+    bph_gpu::algorithm::transform_into(
         &exec,
         zip4(
             u.slice(sep..n_particle),
@@ -116,10 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     let idx = calc_idx(&exec, &x, &y, &z, dt, n_cell)?;
-    let sorted_idx = exec.alloc::<u32>(idx.len());
-    let (sorted_x, sorted_y, sorted_z, sorted_u, sorted_v, sorted_w, _sorted_in_e) =
-        alloc_f32x7(&exec, idx.len());
-    massively::sort_by_key(
+    let (sorted_idx, sorted_values) = massively::vector::sort_by_key(
         &exec,
         idx.slice(..),
         zip7(
@@ -132,17 +129,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             in_e.slice(..),
         ),
         LessU32,
-        sorted_idx.slice_mut(..),
-        zip7(
-            sorted_x.slice_mut(..),
-            sorted_y.slice_mut(..),
-            sorted_z.slice_mut(..),
-            sorted_u.slice_mut(..),
-            sorted_v.slice_mut(..),
-            sorted_w.slice_mut(..),
-            _sorted_in_e.slice_mut(..),
-        ),
     )?;
+    let (sorted_x, sorted_y, sorted_z, sorted_u, sorted_v, sorted_w, _sorted_in_e) =
+        unzip7(sorted_values);
     x = sorted_x;
     y = sorted_y;
     z = sorted_z;
@@ -162,10 +151,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for step in 0..end_step {
         let idx = calc_idx(&exec, &x, &y, &z, dt, n_cell)?;
-        let sorted_idx = exec.alloc::<u32>(idx.len());
-        let (sorted_x, sorted_y, sorted_z, sorted_u, sorted_v, sorted_w, sorted_in_e) =
-            alloc_f32x7(&exec, idx.len());
-        massively::sort_by_key(
+        let (sorted_idx, sorted_values) = massively::vector::sort_by_key(
             &exec,
             idx.slice(..),
             zip7(
@@ -178,17 +164,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 in_e.slice(..),
             ),
             LessU32,
-            sorted_idx.slice_mut(..),
-            zip7(
-                sorted_x.slice_mut(..),
-                sorted_y.slice_mut(..),
-                sorted_z.slice_mut(..),
-                sorted_u.slice_mut(..),
-                sorted_v.slice_mut(..),
-                sorted_w.slice_mut(..),
-                sorted_in_e.slice_mut(..),
-            ),
         )?;
+        let (sorted_x, sorted_y, sorted_z, sorted_u, sorted_v, sorted_w, sorted_in_e) =
+            unzip7(sorted_values);
 
         x = sorted_x;
         y = sorted_y;
@@ -211,7 +189,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             step,
         );
 
-        massively::transform(
+        bph_gpu::algorithm::transform_into(
             &exec,
             zip7(
                 x.slice(..),
@@ -241,8 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(out) = args.out {
         let idx = calc_idx(&exec, &x, &y, &z, dt, n_cell)?;
-        let sorted_idx = exec.alloc::<u32>(idx.len());
-        massively::sort(&exec, idx.slice(..), LessU32, sorted_idx.slice_mut(..))?;
+        let sorted_idx = massively::vector::sort(&exec, idx.slice(..), LessU32)?;
         let counts = exec.full(n_cell as usize, 0_u32)?;
         bph_gpu::algorithm::bucket_counting(&exec, sorted_idx.slice(..), counts.slice_mut(..))?;
         let counts = exec.to_host(&counts)?;
@@ -299,7 +276,7 @@ fn calc_idx<R: Runtime>(
     n_cell: u32,
 ) -> bph_gpu::Error<DeviceVec<R, u32>> {
     let idx = exec.alloc::<u32>(x.len());
-    massively::transform(
+    bph_gpu::algorithm::transform_into(
         exec,
         zip4(
             x.slice(..),
@@ -311,28 +288,6 @@ fn calc_idx<R: Runtime>(
         idx.slice_mut(..),
     )?;
     Ok(idx)
-}
-
-type F32x7<R> = (
-    DeviceVec<R, f32>,
-    DeviceVec<R, f32>,
-    DeviceVec<R, f32>,
-    DeviceVec<R, f32>,
-    DeviceVec<R, f32>,
-    DeviceVec<R, f32>,
-    DeviceVec<R, f32>,
-);
-
-fn alloc_f32x7<R: Runtime>(exec: &Executor<R>, len: usize) -> F32x7<R> {
-    (
-        exec.alloc::<f32>(len),
-        exec.alloc::<f32>(len),
-        exec.alloc::<f32>(len),
-        exec.alloc::<f32>(len),
-        exec.alloc::<f32>(len),
-        exec.alloc::<f32>(len),
-        exec.alloc::<f32>(len),
-    )
 }
 
 fn apply_periodic<R: Runtime>(
@@ -348,7 +303,7 @@ fn apply_periodic<R: Runtime>(
         ),
         OutLo,
     );
-    massively::transform_where(
+    massively::vector::transform_where(
         exec,
         zip3(
             values.slice(..),
@@ -367,7 +322,7 @@ fn apply_periodic<R: Runtime>(
         ),
         OutHi,
     );
-    massively::transform_where(
+    massively::vector::transform_where(
         exec,
         zip3(
             values.slice(..),
@@ -394,7 +349,7 @@ fn apply_reflect_lo_x<R: Runtime>(
         ),
         OutLo,
     );
-    massively::transform_where(exec, u.slice(..), Negate, out_lo, u.slice_mut(..))?;
+    massively::vector::transform_where(exec, u.slice(..), Negate, out_lo, u.slice_mut(..))?;
     let out_lo = massively::lazy::transform(
         zip2(
             x.slice(..),
@@ -402,7 +357,7 @@ fn apply_reflect_lo_x<R: Runtime>(
         ),
         OutLo,
     );
-    massively::transform_where(
+    massively::vector::transform_where(
         exec,
         zip2(
             x.slice(..),
@@ -428,7 +383,7 @@ fn apply_reflect_hi_x<R: Runtime>(
         ),
         OutHi,
     );
-    massively::transform_where(exec, u.slice(..), Negate, out_hi, u.slice_mut(..))?;
+    massively::vector::transform_where(exec, u.slice(..), Negate, out_hi, u.slice_mut(..))?;
     let out_hi = massively::lazy::transform(
         zip2(
             x.slice(..),
@@ -436,7 +391,7 @@ fn apply_reflect_hi_x<R: Runtime>(
         ),
         OutHi,
     );
-    massively::transform_where(
+    massively::vector::transform_where(
         exec,
         zip2(
             x.slice(..),

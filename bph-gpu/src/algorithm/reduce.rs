@@ -15,21 +15,12 @@ where
     Output: MIterMut<R>,
     V: MIter<R, Item = Output::Item>,
     Sum: ReductionOp<Output::Item>,
+    Output::Item: Materializable<R, Materialized = Output::Item>,
 {
-    let cell_idx = exec.alloc::<u32>(idx.len());
-    let scratch = exec.alloc::<Output::Item>(idx.len());
-    let n = massively::reduce_by_key(
-        exec,
-        idx.slice(..),
-        v,
-        Equal,
-        zero,
-        sum,
-        cell_idx.slice_mut(..),
-        scratch.slice_mut(..),
-    )?;
+    let (cell_idx, scratch) =
+        massively::vector::reduce_by_key(exec, idx.slice(..), v, Equal, zero, sum)?;
 
-    massively::scatter(exec, scratch.slice(..n), cell_idx.slice(..n as usize), out)?;
+    massively::vector::scatter(exec, scratch.slice(..), cell_idx.slice(..), out)?;
 
     counting::bucket_counting(exec, idx, counts)
 }

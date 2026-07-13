@@ -13,7 +13,7 @@ pub fn calc_in_e<R: Runtime>(
 ) -> DeviceVec<R, f32> {
     // Compute kinetic energy for each particle.
     let kinetic_e = exec.alloc::<f32>(u.len());
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip4(u, v, w, m),
         calc_kin_e::CalcKinE,
@@ -37,7 +37,7 @@ pub fn calc_in_e<R: Runtime>(
 
     // Multiply by s/3 to compute the internal energy sum for each cell.
     let sum_in_e = exec.alloc::<f32>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             sum_kinetic_e.slice(..),
@@ -50,7 +50,7 @@ pub fn calc_in_e<R: Runtime>(
 
     // Divide by the particle count to get the per-particle internal energy for each cell.
     let in_e = exec.alloc::<f32>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(sum_in_e.slice(..), cnt.slice(..)),
         common::CellAve_F32_1,
@@ -59,10 +59,7 @@ pub fn calc_in_e<R: Runtime>(
     .unwrap();
 
     // Permute by particle index and return internal energy for each particle.
-    let out = exec.alloc::<f32>(idx.len());
-    massively::gather(exec, in_e.slice(..), idx.slice(..), out.slice_mut(..)).unwrap();
-
-    out
+    massively::vector::gather(exec, in_e.slice(..), idx.slice(..)).unwrap()
 }
 
 struct CalcInE;

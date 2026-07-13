@@ -37,7 +37,7 @@ pub fn alloc_balanced_shell_rand<R: Runtime>(
     .unwrap();
 
     let Zip(Zip(cell_ave_u, cell_ave_v), cell_ave_w) = exec.alloc::<f32_3>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             zip3(
@@ -65,7 +65,7 @@ pub fn alloc_balanced_shell_rand<R: Runtime>(
         idx.slice(..),
     );
 
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(zip3(u.slice(..), v.slice(..), w.slice(..)), ave),
         common::Sub_F32_3,
@@ -91,7 +91,7 @@ pub fn relax<R: Runtime>(
     // -----------------------------------------------------------------
 
     let total_e = exec.alloc::<f32>(idx.len());
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip5(
             u.slice(..),
@@ -147,7 +147,7 @@ pub fn relax<R: Runtime>(
 
     // 3.1 Compute current kinetic energy for each cell after shell assignment.
     let kinetic_e = exec.alloc::<f32>(idx.len());
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip4(u.slice(..), v.slice(..), w.slice(..), m.slice(..)),
         calc_kin_e::CalcKinE,
@@ -171,7 +171,7 @@ pub fn relax<R: Runtime>(
     // 3.2 Compute kinetic energy redistributed from total energy for each cell.
     // Target kinetic energy = total energy * 3 / (3+s).
     let cell_sum_tobe_kin_e = exec.alloc::<f32>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             cell_sum_total_e.slice(..),
@@ -185,7 +185,7 @@ pub fn relax<R: Runtime>(
     // 3.3 Compute the velocity ratio from the kinetic energy ratio.
     // Ratio = sqrt(target kinetic energy / actual kinetic energy).
     let cell_vel_ratio = exec.alloc::<f32>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(cell_sum_tobe_kin_e.slice(..), cell_sum_kin_e.slice(..)),
         CalcVelocityRatio,
@@ -194,7 +194,7 @@ pub fn relax<R: Runtime>(
     .unwrap();
 
     // 3.4 Scale velocities by the ratio.
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip4(
             u.slice(..),
@@ -213,7 +213,7 @@ pub fn relax<R: Runtime>(
 
     // Compute new internal energy.
     let cell_sum_tobe_in_e = exec.alloc::<f32>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(
             cell_sum_total_e.slice(..),
@@ -225,7 +225,7 @@ pub fn relax<R: Runtime>(
     .unwrap();
 
     let cell_tobe_in_e = exec.alloc::<f32>(k as usize);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(cell_sum_tobe_in_e.slice(..), cell_cnt.slice(..)),
         common::CellAve_F32_1,
@@ -233,7 +233,7 @@ pub fn relax<R: Runtime>(
     )
     .unwrap();
 
-    massively::gather_where(
+    massively::vector::gather_where(
         exec,
         cell_tobe_in_e.slice(..),
         idx.slice(..),

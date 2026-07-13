@@ -10,25 +10,16 @@ pub fn bucket_counting<R: Runtime>(
     let k = out.len();
     let counting = massively::lazy::counting(0).take(k as u32);
 
-    let begin = exec.full(k, 0_u32)?;
-    massively::lower_bound(
-        exec,
-        idx.slice(..),
-        counting,
-        OrderingU32,
-        begin.slice_mut(..),
-    )?;
+    let begin = massively::vector::lower_bound(exec, idx.slice(..), counting, OrderingU32)?;
 
-    let end = exec.full(k, 0_u32)?;
-    massively::upper_bound(
+    let end = massively::vector::upper_bound(
         exec,
         idx.slice(..),
         massively::lazy::counting(0).take(k as u32),
         OrderingU32,
-        end.slice_mut(..),
     )?;
 
-    massively::transform(exec, zip2(end.slice(..), begin.slice(..)), CalcDiff, out)
+    transform_into(exec, zip2(end.slice(..), begin.slice(..)), CalcDiff, out)
 }
 
 struct OrderingU32;

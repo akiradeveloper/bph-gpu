@@ -16,7 +16,7 @@ pub fn alloc_shell_rand<R: Runtime>(
     let uniform2 = massively::util::random::uniform_f32(0., 1., seed.wrapping_add(1))
         .unwrap()
         .take(n as u32);
-    massively::transform(
+    crate::algorithm::transform_into(
         exec,
         zip2(uniform1, uniform2),
         ShellRand,
